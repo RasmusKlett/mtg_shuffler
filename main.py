@@ -10,6 +10,30 @@ import numpy as np
 
 type Sample = list[bool]
 
+# Constants to scale the dota probability function to a certain mean probability.
+# First value is mean probability, second is c value to achieve it.
+DOTA_C_VALUES = [
+    (0.05, 0.003801658303553139101756466),
+    (0.10, 0.014745844781072675877050816),
+    (0.15, 0.032220914373087674975117359),
+    (0.20, 0.055704042949781851858398652),
+    (0.25, 0.084744091852316990275274806),
+    (0.30, 0.118949192725403987583755553),
+    (0.35, 0.157983098125747077557540462),
+    (0.40, 0.201547413607754017070679639),
+    (0.45, 0.249306998440163189714677100),
+    (0.50, 0.302103025348741965169160432),
+    (0.55, 0.360397850933168697104686803),
+    (0.60, 0.422649730810374235490851220),
+    (0.65, 0.481125478337229174401911323),
+    (0.70, 0.571428571428571428571428572),
+    (0.75, 0.666666666666666666666666667),
+    (0.80, 0.750000000000000000000000000),
+    (0.85, 0.823529411764705882352941177),
+    (0.90, 0.888888888888888888888888889),
+    (0.95, 0.947368421052631578947368421),
+]
+
 
 # %%
 def default_distribution(num: int, land_prob=0.4) -> Sample:
@@ -24,22 +48,46 @@ def deterministic_distribution(num: int) -> Sample:
     return list(itertools.islice(card_gen, num))
 
 
-def dota_probabilities() -> list[float]:
+def dota_probabilities(c_const=0.201547413607754017070679639) -> list[float]:
     """
     The distribution used by Dota 2. 40% lands on average.
     Looks a little too restrictive, maybe we want more randomness than this?
 
     See https://dota2.fandom.com/wiki/Random_Distribution?so=search#Pseudo_random_events
     """
-    c_const = 0.201547413607754017070679639
+
     probabilities = []
-    for k in range(1, math.ceil(1 / c_const) + 1):
+    for k in range(1, min(math.ceil(1 / c_const) + 1, 40)):
         probabilities.append(
             math.factorial(k)
             * c_const
             * math.prod(1 / i - c_const for i in range(1, k))
         )
     return probabilities
+
+
+dota_probabilities_precomputed = []
+
+for prob, c_value in DOTA_C_VALUES:
+    dota_probabilities_precomputed.append((prob, dota_probabilities(c_value)))
+
+
+def nearest_dota_probabilities(mean_prob: float):
+    """
+    Find the probabilities from dota_probabilities_precomputed that best match
+    the given mean probability
+    """
+    lowest_dist = abs(dota_probabilities_precomputed[0][0] - mean_prob)
+    best_probabilities = dota_probabilities_precomputed[0][1]
+
+    for p, probabilities in dota_probabilities_precomputed:
+        dist = abs(p - mean_prob)
+        if dist > lowest_dist:
+            # We found the lowest distance
+            break
+        lowest_dist = dist
+        best_probabilities = probabilities
+    return best_probabilities
 
 
 def probability_to_sample_inf(prob: list[float]) -> typing.Iterable[bool]:
@@ -79,6 +127,39 @@ def probability_to_sample(prob: list[float], num: int) -> Sample:
 
     return sample
 
+
+def adaptive_dota_distribution(spells: int, lands: int) -> Sample:
+    sample = []
+
+    to_draw = []  # Keeps track of what we have drawn from the distribution
+
+    # Add one card to sample per iteration
+    while spells > 0 and lands > 0:
+        if len(to_draw) == 0:
+            # Distribution values ran out, need to take a new random with updated
+            # probabilities
+            probs = nearest_dota_probabilities(lands / (lands + spells))
+            dist_to_next_land = random.choices(list(range(1, len(probs) + 1)), probs)[0]
+            # print("dist_top_next_land", dist_to_next_land)
+            to_draw += [False] * (dist_to_next_land - 1)
+            to_draw.append(True)
+        card = to_draw.pop(0)
+        if card:
+            lands -= 1
+        else:
+            spells -= 1
+        sample.append(card)
+
+    # Fill out the last of the deck with spells or lands. At most one of these will do something
+    # Most of the time these should be close to 0
+    # print("Lands, spells", lands, spells)
+    sample += [True] * lands
+    sample += [False] * spells
+
+    return sample
+
+
+adaptive_dota_sample = adaptive_dota_distribution(36, 24)
 
 # %%
 
@@ -167,6 +248,7 @@ samples_to_run = {
     "DEFAULT DISTRIBUTION": default_sample,
     "DETERMINISTIC DISTRIBUTION": determ_sample,
     "DOTA DISTRIBUTION": dota_sample,
+    "ADAPTIVE DOTA DISTRIBUTION": dota_sample,
     "DOTA GEO MEANED DISTRIBUTION": dota_geo_sample,
 }
 
@@ -204,6 +286,9 @@ samples_to_run = {
     "DEFAULT DISTRIBUTION": default_distribution,
     "DOTA DISTRIBUTION": lambda x: probability_to_sample(dota_probs, x),
     "DOTA GEO MEANED DISTRIBUTION": lambda x: probability_to_sample(dota_geo_meaned, x),
+    "ADAPTIVE_DOTA_DISTRIBUTION": lambda x: adaptive_dota_distribution(
+        round(x * 0.6), round(x * 0.4)
+    ),
 }
 
 fig, ax = plt.subplots()
