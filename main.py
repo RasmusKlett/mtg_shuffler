@@ -80,7 +80,7 @@ def nearest_dota_probabilities(mean_prob: float):
     lowest_dist = abs(dota_probabilities_precomputed[0][0] - mean_prob)
     best_probabilities = dota_probabilities_precomputed[0][1]
 
-    for p, probabilities in dota_probabilities_precomputed:
+    for p, probabilities in dota_probabilities_precomputed[1:]:
         dist = abs(p - mean_prob)
         if dist > lowest_dist:
             # We found the lowest distance
@@ -128,21 +128,57 @@ def probability_to_sample(prob: list[float], num: int) -> Sample:
     return sample
 
 
+def geometric_probability_distribution(prob_succ: float, max_trials: int):
+    """
+    Calculate the first n geometric distribution probabilities
+    """
+    probabilities = []
+    for k in range(1, max_trials):
+        probability = ((1 - prob_succ) ** (k - 1)) * prob_succ
+        probabilities.append(probability)
+    return list(range(1, len(probabilities) + 1)), probabilities
+
+
 def adaptive_dota_distribution(spells: int, lands: int) -> Sample:
+    """
+    Make a sample using the dota distribution, but reevaluate the drawing probabilities
+    after each draw, to ensure lands remain evenly spaced at end of deck even if we
+    happen to draw many lands early, and vice versa.
+    """
     sample = []
 
     to_draw = []  # Keeps track of what we have drawn from the distribution
+    first = True
 
     # Add one card to sample per iteration
     while spells > 0 and lands > 0:
         if len(to_draw) == 0:
             # Distribution values ran out, need to take a new random with updated
             # probabilities
-            probs = nearest_dota_probabilities(lands / (lands + spells))
+            if first:
+                # The dota distribution is correct on average, but starts out at a very low
+                # probability, which will skew the average draw noticeably for short games.
+                # To counteract, we draw the first from this distribution to balance it out.
+                first = False
+                probs = [0.4, 0.314, 0.19, 0.086]
+                # probs = [0.4, 0.32, 0.2, 0.08]
+            else:
+                probs = nearest_dota_probabilities(lands / (lands + spells))
             dist_to_next_land = random.choices(list(range(1, len(probs) + 1)), probs)[0]
-            # print("dist_top_next_land", dist_to_next_land)
+
             to_draw += [False] * (dist_to_next_land - 1)
             to_draw.append(True)
+
+        # An attempt at reducing the clumping of lands at the end
+        # if len(to_draw) > (lands + spells):
+        #     final_cards = [False] * (lands + spells)
+        #     for index in random.sample(range(len(final_cards)), lands):
+        #         final_cards[index] = True
+        #     sample += final_cards
+        #     lands = 0
+        #     spells = 0
+        #     break
+
         card = to_draw.pop(0)
         if card:
             lands -= 1
@@ -152,7 +188,6 @@ def adaptive_dota_distribution(spells: int, lands: int) -> Sample:
 
     # Fill out the last of the deck with spells or lands. At most one of these will do something
     # Most of the time these should be close to 0
-    # print("Lands, spells", lands, spells)
     sample += [True] * lands
     sample += [False] * spells
 
@@ -179,17 +214,6 @@ def plot_int_probs(sample: Sample, ax, *args, **kwargs):
     )
 
 
-def geometric_probability_distribution(prob_succ: float, max_trials: int):
-    """
-    Calculate the first n geometric distribution probabilities
-    """
-    probabilities = []
-    for k in range(1, max_trials):
-        probability = ((1 - prob_succ) ** (k - 1)) * prob_succ
-        probabilities.append(probability)
-    return list(range(1, len(probabilities) + 1)), probabilities
-
-
 # %%
 def dist_stdev(sample: Sample):
     """
@@ -211,13 +235,13 @@ def dist_stdev(sample: Sample):
 # %%
 # Make samples
 land_prob = 0.4
-default_sample = default_distribution(num=1000, land_prob=land_prob)
+default_sample = default_distribution(num=5000, land_prob=land_prob)
 default_cards_between_lands, _ = dist_stdev(default_sample)
 
-determ_sample = deterministic_distribution(1000)
+determ_sample = deterministic_distribution(5000)
 
 dota_probs = dota_probabilities()
-dota_sample = probability_to_sample(dota_probs, 1000)
+dota_sample = probability_to_sample(dota_probs, 5000)
 
 geometric_vals = geometric_probability_distribution(
     land_prob, max(default_cards_between_lands)
@@ -226,7 +250,7 @@ dota_geo_meaned = list(
     (a + b) / 2
     for a, b in itertools.zip_longest(geometric_vals[1], dota_probs, fillvalue=0)
 )
-dota_geo_sample = probability_to_sample(dota_geo_meaned, 1000)
+dota_geo_sample = probability_to_sample(dota_geo_meaned, 5000)
 # %%
 
 fig, ax = plt.subplots()
@@ -300,5 +324,21 @@ for name, distribution in samples_to_run.items():
 
 fig.suptitle(f"Probability of drawing x lands in {cards_to_draw} cards")
 ax.legend()
+
+# %%
+
+count = 20000
+# arr = np.array([probability_to_sample(dota_probs, 100) for _ in range(count)])
+arr = np.array([adaptive_dota_distribution(60, 40) for _ in range(count)])
+avg_per_slot = arr.sum(axis=0) / count
+
+fig, ax = plt.subplots()
+fig.suptitle(
+    "Average in first half: %f" % avg_per_slot[: len(avg_per_slot) // 2].mean()
+)
+ax.plot(avg_per_slot, marker="x")
+# ax.plot(avg_per_slot[:50], marker="x")
+ax.set_xlabel("draw number")
+ax.set_ylabel("Land probability")
 
 # %%
