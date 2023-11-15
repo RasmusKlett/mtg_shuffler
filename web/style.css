@@ -1,0 +1,49 @@
+
+@keyframes slidein {
+  from {
+    margin-left: -162px;
+  }
+
+  to {
+    margin-left: 0px;
+  }
+}
+
+#card-numbers {
+    margin-bottom: 20px;
+}
+
+#drawnCards {
+    margin-top: 20px;
+    white-space: nowrap;
+    overflow-y: hidden;
+}
+
+#drawnCards .spell {
+    background-image: url("mtg_spell.jpg");
+}
+#drawnCards .land {
+    background-image: url("mtg_mana2.jpg");
+}
+#drawnCards .card {
+    overflow: hidden;
+    display: inline-block;
+    margin-right: 20px;
+    width: 142px;
+    height: 200px;
+
+    border-color: black;
+    border-style:solid;
+    border-radius: 7px;
+    border-width: 9px;
+
+    background-size: cover;
+    background-position: center;
+
+    animation: 0.5s ease-out slidein;
+    filter: blur(1px) saturate(50%) brightness(70%);    
+    transition: filter 0.5s ease-out;
+}
+#drawnCards .card:first-child {
+    filter: none;
+}
