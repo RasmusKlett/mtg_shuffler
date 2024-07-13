@@ -32,6 +32,15 @@ const product = (nums) => nums.length > 0 ? nums.reduce((x, y) => x * y, 1) : 1
 
 const factorial = (num) => product(range(1, num + 1))
 
+const stdev = (sample) => {
+    if (sample.length == 1) {
+        return 0.0
+    }
+    const mean = sum(sample) / sample.length
+    const vari = sample.reduce((acc, value) => acc + (value - mean)**2 / (sample.length - 1), 0)
+    return Math.sqrt(vari)
+}
+
 // Implements subset of Python random.choices
 const randomChoice = (values, weights) => {
     if (values.length !== weights.length) {
@@ -84,9 +93,19 @@ function adaptiveDotaDistribution(spells, lands) {
     const sample = []
 
     const to_draw = []
+    let first = true
+    
     while (spells > 0 & lands > 0) {
         if (to_draw.length == 0) {
-            const probs = nearestDotaProbabilities(lands / (lands + spells))
+            let probs = undefined
+            if (first) {
+                // console.log("first")
+                first = false
+                probs = [0.4, 0.314, 0.19, 0.086]
+            } else {
+                // console.log("Later")
+                probs = nearestDotaProbabilities(lands / (lands + spells))
+            }
             const distToNextLand = randomChoice(range(1, probs.length + 1), probs)
             to_draw.push(...Array(distToNextLand - 1).fill(false))
             to_draw.push(true)
@@ -148,4 +167,35 @@ function drawCard() {
     const newElement = document.createElement("div")
     newElement.className = "card " + (card ? "land" : "spell")
     drawnCardsEl.prepend(newElement)
+}
+
+const distStdev = sample => {
+    const cardsBetweenLands = []
+
+    let last_land_index = 0
+    for (const [index, card] of sample.entries()) {
+        if (card) {
+            cardsBetweenLands.push(index - last_land_index)
+            last_land_index = index
+        }
+    }
+    return [cardsBetweenLands, stdev(cardsBetweenLands)]
+}
+
+const meanAfterNCards = num_cards => {
+    const results = Array.from({length: 10000}, _ => 
+        sum(adaptiveDotaDistribution(36, 24).slice(0, num_cards))
+    )
+    console.log("results", results)
+    return sum(results) / results.length
+}
+
+function analyse() {
+    const sampleAna = adaptiveDotaDistribution(3000, 2000)
+    const [cardsBetweenLands, sampleStdev] = distStdev(sampleAna)
+    console.log("Mean distance", sum(cardsBetweenLands) / cardsBetweenLands.length)
+    console.log("Std. deviation", sampleStdev)
+    console.log("Mean lands after 11 cards", meanAfterNCards(11))
+
+    console.log(cardsBetweenLands)
 }

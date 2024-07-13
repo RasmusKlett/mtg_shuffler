@@ -194,8 +194,6 @@ def adaptive_dota_distribution(spells: int, lands: int) -> Sample:
     return sample
 
 
-adaptive_dota_sample = adaptive_dota_distribution(36, 24)
-
 # %%
 
 
@@ -243,6 +241,8 @@ determ_sample = deterministic_distribution(5000)
 dota_probs = dota_probabilities()
 dota_sample = probability_to_sample(dota_probs, 5000)
 
+adaptive_dota_sample = adaptive_dota_distribution(round(5000 * 0.6), round(5000 * 0.4))
+
 geometric_vals = geometric_probability_distribution(
     land_prob, max(default_cards_between_lands)
 )
@@ -272,7 +272,7 @@ samples_to_run = {
     "DEFAULT DISTRIBUTION": default_sample,
     "DETERMINISTIC DISTRIBUTION": determ_sample,
     "DOTA DISTRIBUTION": dota_sample,
-    "ADAPTIVE DOTA DISTRIBUTION": dota_sample,
+    "ADAPTIVE DOTA DISTRIBUTION": adaptive_dota_sample,
     "DOTA GEO MEANED DISTRIBUTION": dota_geo_sample,
 }
 
