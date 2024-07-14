@@ -169,6 +169,15 @@ function drawCard() {
     drawnCardsEl.prepend(newElement)
 }
 
+function reset() {
+    console.log("Resetting")
+    spellInputEl.disabled = false
+    landInputEl.disabled = false
+    sample = null
+    initialized = false
+    drawnCardsEl.replaceChildren()
+}
+
 const distStdev = sample => {
     const cardsBetweenLands = []
 
