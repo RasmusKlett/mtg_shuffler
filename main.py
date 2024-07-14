@@ -254,6 +254,9 @@ dota_geo_sample = probability_to_sample(dota_geo_meaned, 5000)
 # %%
 
 fig, ax = plt.subplots()
+fig.suptitle("Probability of draws until next land")
+ax.set_xlabel("Card draws")
+ax.set_ylabel("Probability")
 plot_int_probs(default_cards_between_lands, ax, label="empirical default")
 ax.plot(*geometric_vals, label="geometric")
 print(dota_probs)
@@ -323,6 +326,8 @@ for name, distribution in samples_to_run.items():
     ax.plot(*results, label=name, marker="o")
 
 fig.suptitle(f"Probability of drawing x lands in {cards_to_draw} cards")
+ax.set_xlabel("Lands drawn")
+ax.set_ylabel("Probability")
 ax.legend()
 
 # %%
